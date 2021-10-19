@@ -9,6 +9,7 @@ from typing import Optional
 from typing import Sequence
 from typing import Set
 from typing import Tuple
+import sqlfluff
 
 from pre_commit_dbt.check_script_has_no_table_name import has_table_name
 from pre_commit_dbt.utils import add_filenames_args
