@@ -6,35 +6,11 @@ from typing import Optional
 from typing import Sequence
 from typing import Set
 from typing import Tuple
+import sqlfluff
 
 from pre_commit_dbt.utils import add_filenames_args
 
-REGEX_COMMENTS = (
-    r"((\/\*|\{#)([^*]|[\r\n]|([\*#]+([^*\/#]|[\r\n])))*(\*+\/|#\})|[ \t]*--.*)"
-)
-REGEX_SPLIT = r"[\s]+"
-IGNORE_WORDS = ["", "(", "{{"]  # pragma: no mutate
 REGEX_PARENTHESIS = r"([\(\)])"  # pragma: no mutate
-
-
-def prev_cur_next_iter(
-    sql: Sequence[str],
-) -> Generator[Tuple[Optional[str], str, Optional[str]], None, None]:
-    sql_iter = iter(sql)
-    prev = None
-    cur = next(sql_iter).lower()
-    try:
-        while True:
-            nxt = next(sql_iter).lower()  # pragma: no mutate
-            yield prev, cur, nxt
-            prev = cur
-            cur = nxt
-    except StopIteration:
-        yield prev, cur, None
-
-
-def replace_comments(sql: str) -> str:
-    return re.sub(REGEX_COMMENTS, "", sql)
 
 
 def add_space_to_parenthesis(sql: str) -> str:
@@ -45,28 +21,12 @@ def has_table_name(
     sql: str, filename: str, dotless: Optional[bool] = False
 ) -> Tuple[int, Set[str]]:
     status_code = 0
-    sql_clean = replace_comments(sql)
-    sql_clean = add_space_to_parenthesis(sql_clean)
-    sql_split = re.split(REGEX_SPLIT, sql_clean)
-    tables = set()
-    cte = set()
-
-    for prev, cur, nxt in prev_cur_next_iter(sql_split):
-        if prev in ["from", "join"] and cur not in IGNORE_WORDS:
-            table = cur.lower().strip().replace(",", "") if cur else cur
-            if dotless and "." not in table:
-                pass
-            else:
-                tables.add(table)
-        if (
-            cur.lower() == "as" and nxt and nxt[0] == "(" and prev not in IGNORE_WORDS
-        ):  # pragma: no mutate
-            cte.add(prev.lower() if prev else prev)
-
-    table_names = tables.difference(cte)
-    if table_names:
-        status_code = 1
-    return status_code, table_names
+    sql_clean = add_space_to_parenthesis(sql)
+    parsed_sql = sqlfluff.parse(sql_clean)
+    table_names = parsed_sql.tree.get_table_references()
+    table_names_lower = [table.lower() for table in table_names]
+    table_names_lower = set(table_names_lower)
+    return status_code, table_names_lower
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
