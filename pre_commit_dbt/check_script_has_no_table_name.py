@@ -26,6 +26,8 @@ def has_table_name(
     table_names = parsed_sql.tree.get_table_references()
     table_names_lower = [table.lower() for table in table_names]
     table_names_lower = set(table_names_lower)
+    if table_names_lower:
+        status_code = 1
     return status_code, table_names_lower
 
 
